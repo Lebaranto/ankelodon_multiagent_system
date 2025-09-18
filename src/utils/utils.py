@@ -1,8 +1,65 @@
+from typing import Iterable, Optional
+
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from schemas import ComplexityLevel, ExecutionReport
+
+from schemas import ComplexityLevel, ExecutionReport, PlannerPlan
 from prompts.prompts import COMPLEXITY_ASSESSOR_PROMPT
 from config import llm
 from state import AgentState
+
+def log_stage(title: str, subtitle: Optional[str] = None, icon: str = "🚀") -> None:
+    """Render a banner for the current execution stage."""
+
+    title_line = f" {title.strip()} "
+    border = icon + " " + "═" * max(len(title_line), 20)
+    print(f"\n{border}\n{icon} {title_line}\n{icon} " + "═" * max(len(title_line), 20))
+    if subtitle:
+        print(f"{icon} {subtitle}")
+
+
+def log_key_values(pairs: Iterable[tuple[str, str]]) -> None:
+    """Pretty-print simple key/value diagnostics."""
+
+    for key, value in pairs:
+        print(f"   • {key}: {value}")
+
+
+def format_plan_overview(plan: PlannerPlan) -> str:
+    """Create a human-readable summary of plan steps."""
+
+    if not plan or not plan.steps:
+        return "(no steps – direct response)"
+
+    lines = []
+    for step in plan.steps:
+        tool_hint = step.tool if step.tool else "no tool"
+        lines.append(f"{step.id}: {step.goal} [{tool_hint}]")
+    return "\n".join(lines)
+
+
+def display_plan(plan: PlannerPlan) -> None:
+    """Print plan contents in a compact, readable form."""
+
+    log_stage("PLANNER OUTPUT", icon="🧭")
+    print(f"Task type: {plan.task_type}")
+    print(f"Summary: {plan.summary}")
+    if plan.assumptions:
+        print("Assumptions:")
+        for item in plan.assumptions:
+            print(f"   - {item}")
+    print("Steps:")
+    for step in plan.steps:
+        print(f"   {step.id} → {step.goal}")
+        if step.tool:
+            print(f"      tool: {step.tool}")
+        if step.inputs:
+            print(f"      inputs: {step.inputs}")
+        print(f"      expected: {step.expected_result}")
+        if step.on_fail:
+            print(f"      on_fail: {step.on_fail}")
+    if plan.answer_guidelines:
+        print(f"Answer guidelines: {plan.answer_guidelines}")
+
 
 def clean_message_history(messages):
     """

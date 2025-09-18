@@ -1,5 +1,5 @@
-from typing import Any, Dict, List, Optional, Literal, Iterable
-from pydantic import BaseModel, Field, ValidationError
+from typing import List, Optional, Literal
+from pydantic import BaseModel, Field
 
 
 class ComplexityLevel(BaseModel):
@@ -21,32 +21,22 @@ class CritiqueFeedback(BaseModel):
 
 
 TaskType = Literal["info", "calc", "table", "doc_qa", "image_qa", "multi_hop"]
-EvidenceTag = Literal["citations", "page_numbers", "figure_captions", "stats_check", "unit_check"]
 
 class PlanStep(BaseModel):
-    id: str
-    description: str
-    #tool: Optional[str] = Field(default=None, description="Exact tool name or null for reasoning step")
-    #args_hint: Dict[str, Any] = Field(default_factory=dict)
-    evidence_needed: List[EvidenceTag] = Field(default_factory=list)
-    success_criteria: str
-    on_fail: str = Field(default="replan", description="One of: 'replan' | 'stop' | step-id")
-    outputs_to_state: List[str] = Field(default_factory=list)
+    id: str = Field(description="Unique step identifier (e.g., s1)")
+    goal: str = Field(description="What the step accomplishes and why")
+    tool: Optional[str] = Field(default=None, description="Exact tool name or null when no tool is required")
+    inputs: Optional[str] = Field(default=None, description="Important inputs or references needed for the step")
+    expected_result: str = Field(description="How to confirm the step succeeded")
+    on_fail: str = Field(default="replan", description="Fallback action if the step fails (replan or stop)")
 
-class AnswerGuidelines(BaseModel):
-    final_answer_template: str
-    citations_required: bool = False
-    min_citations: int = 0
-    units_policy: Optional[str] = None
-    rounding_policy: Optional[str] = None
-    include_artifacts: List[str] = Field(default_factory=list)
 
 class PlannerPlan(BaseModel):
     task_type: TaskType
+    summary: str = Field(description="Short explanation of the chosen strategy")
     assumptions: List[str] = Field(default_factory=list)
-    plan_rationale: str
-    steps: List[PlanStep]
-    answer_guidelines: AnswerGuidelines
+    steps: List[PlanStep] = Field(default_factory=list)
+    answer_guidelines: Optional[str] = Field(default=None, description="Reminders for formatting, citations, etc.")
 
 
 class ToolExecution(BaseModel):
