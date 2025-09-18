@@ -1,9 +1,9 @@
 import os
-from typing import Optional
-
 from state import AgentState
 from tools.tools import preprocess_files
+from typing import Optional
 from langgraph.prebuilt import ToolNode
+
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
 
 from prompts.prompts import (
@@ -12,8 +12,10 @@ from prompts.prompts import (
     COMPLEXITY_ASSESSOR_PROMPT,
     CRITIC_PROMPT,
 )
+
 from config import llm, TOOLS, planner_llm, llm_with_tools
 from schemas import PlannerPlan, ComplexityLevel, CritiqueFeedback, ExecutionReport, ToolExecution
+
 from utils.utils import (
     format_final_answer,
     clean_message_history,
@@ -22,7 +24,6 @@ from utils.utils import (
     display_plan,
     format_plan_overview,
 )
-
 
 def _build_planner_prompt(state: AgentState, extra_context: Optional[str] = None) -> str:
     tool_catalogue = ", ".join(sorted(tool.name for tool in TOOLS))
@@ -35,15 +36,18 @@ def _build_planner_prompt(state: AgentState, extra_context: Optional[str] = None
         extra_context=extra,
     ).strip()
 
-def query_input(state: AgentState) -> AgentState:
+def query_input(state : AgentState) -> AgentState:
     log_stage("USER QUERY", icon="💡")
+    #print("=== USER QUERY TRANSFERED TO AGENT ===")
 
     files = state.get("files", [])
     if files:
+        print(f"Processing {len(files)} files:")
         log_stage("FILE PREPARATION", subtitle=f"Processing {len(files)} file(s)", icon="📁")
         file_info = preprocess_files(files)
-
+    
         for file_path, info in file_info.items():
+            print(f"  - {file_path}: {info['type']} ({info['size']} bytes) -> {info['suggested_tool']}")
             log_key_values(
                 [
                     ("path", file_path),
@@ -52,39 +56,42 @@ def query_input(state: AgentState) -> AgentState:
                     ("suggested_tool", info["suggested_tool"]),
                 ]
             )
-
         state["file_contents"] = file_info
         file_context = "\n\n=== AVAILABLE FILES FOR ANALYSIS ===\n"
         for file_path, info in file_info.items():
             filename = os.path.basename(file_path)
             file_context += f"File: {filename}\n"
-            file_context += f"  - Type: {info['type']}\n"
+            file_context += f"  - Type: {info['type']}\n"  
             file_context += f"  - Size: {info['size']} bytes\n"
             file_context += f"  - Suggested tool: {info['suggested_tool']}\n"
             if info.get("preview"):
                 file_context += f"  - Preview: {info['preview']}\n"
             file_context += "\n"
-
+        
+        # Добавляем инструкции по работе с файлами
         file_context += "IMPORTANT: Use the suggested tools to analyze these files before processing their data.\n"
         file_context += "File paths are available in the agent state and can be passed directly to analysis tools.\n"
-
-        original_query = state.get("query", "")
-        state["query"] = original_query + file_context
+    
     else:
         log_key_values([("files", "none provided")])
+        file_context = ""
+        original_query = state.get("query", "")
+        state["query"] = original_query + file_context
     return state
 
 
-def planner(state: AgentState) -> AgentState:
+def planner(state : AgentState) -> AgentState:
+
     log_stage("PLANNING", icon="🧭")
     planner_prompt = _build_planner_prompt(state)
 
     sys_stack = [
-        SystemMessage(content=planner_prompt),
-        HumanMessage(content=state["query"]),
-    ]
+            SystemMessage(content=planner_prompt),
+            HumanMessage(content=state["query"]),
+        ]
     plan: PlannerPlan = planner_llm.invoke(sys_stack)
-
+    
+    #print("=== GENERATED PLAN ===")
     display_plan(plan)
     return {
         "messages": state["messages"] + sys_stack,
@@ -95,19 +102,40 @@ def planner(state: AgentState) -> AgentState:
 
 
 def agent(state: AgentState) -> AgentState:
+    
+    """
+    sys_msg = SystemMessage(
+        content=SYSTEM_EXECUTOR_PROMPT.strip().format(
+            plan=json.dumps(state["plan"], indent=2)
+        )
+    )
+    """
     current_step = state.get("current_step", 0)
     reasoning_done = state.get("reasoning_done", False)
     plan: Optional[PlannerPlan] = state.get("plan")
+    #steps = state["plan"].steps
 
-    if not plan or not hasattr(plan, "steps"):
+    """
+    print(f"=== AGENT DEBUG ===")
+    print(f"Current step: {current_step}")
+    print(f"Reasoning done: {reasoning_done}")
+    print(f"Plan exists: {plan is not None}")
+    print(f"Total steps in plan: {len(plan.steps) if plan else 'No plan'}")
+
+    if not plan or not hasattr(plan, 'steps') or not plan.steps:
+        print("ERROR: No valid plan found!")
+    """
+
+    if not plan or not hasattr(plan, 'steps'):
         log_stage("PLAN VALIDATION", subtitle="Planner returned no actionable steps", icon="⚠️")
         warning = AIMessage(content="No valid plan available. <FINAL_ANSWER>")
         return {
             "messages": state["messages"] + [warning],
             "reasoning_done": False,
         }
-
+    
     steps = plan.steps
+    
     total_steps = len(steps)
 
     if total_steps == 0:
@@ -127,6 +155,8 @@ def agent(state: AgentState) -> AgentState:
         }
 
     current_step_info = steps[current_step]
+    #print(f"Executing step {current_step + 1}: {current_step_info.description}")
+
     log_stage(
         "EXECUTION",
         subtitle=f"Step {current_step + 1}/{total_steps}: {current_step_info.goal}",
@@ -157,7 +187,9 @@ def agent(state: AgentState) -> AgentState:
         ).strip()
     )
 
+
     if not reasoning_done:
+
         instruction = HumanMessage(
             content=(
                 "Provide reasoning for this step inside <REASONING>...</REASONING>. "
@@ -169,65 +201,67 @@ def agent(state: AgentState) -> AgentState:
         log_stage("REASONING", subtitle=f"{current_step_info.id}", icon="🧠")
         print(reasoning_response.content)
 
+        # ✅ ДОБАВЛЕНО: Специальный контекст для файлов
+        file_context = ""
+        file_contents = state.get("file_contents", {})
+        if file_contents:
+            file_context = "\n\nAVAILABLE FILES IN CURRENT SESSION:\n"
+            for filepath, info in file_contents.items():
+                filename = os.path.basename(filepath)
+                file_context += f"- {filename}: {info['type']} file, suggested tool: {info['suggested_tool']}\n"
+                file_context += f"  Path: {filepath}\n"
+
+        reasoning_prompt = f"""
+        {SYSTEM_EXECUTOR_PROMPT}
+        
+        CURRENT TASK: You must perform reasoning for step {current_step + 1}.
+        
+        STEP INFO: {current_step_info}\n\n
+
+        FILE CONTEXT: {file_contents}
+        
+        CRITICAL: You MUST output your reasoning in <REASONING> tags, but DO NOT call any tools yet.
+        Explain what you need to do and why, then end your response.
+
+        REASONING IS IMPERATIVE BEFORE ANY TOOL CALLS.
+        """
+
+        sys_msg = SystemMessage(content = reasoning_prompt)
+        stack = [sys_msg] + state["messages"]
+
+        step = llm.invoke(stack)
+        print("=== REASONING STEP ===")
+        print(step.content)
+
         return {
-            "messages": state["messages"] + [reasoning_response],
-            "reasoning_done": True,
+            "messages" : state["messages"] + [step],
+            "reasoning_done" : True
         }
-
-    available_tools = {tool.name for tool in TOOLS}
-    if current_step_info.tool and current_step_info.tool not in available_tools:
-        log_stage(
-            "TOOL WARNING",
-            subtitle=f"Unknown tool '{current_step_info.tool}' in plan",
-            icon="⚠️",
-        )
-        warning = AIMessage(
-            content=(
-                f"<REASONING>Unable to execute {current_step_info.id}: tool "
-                f"'{current_step_info.tool}' is unavailable. Requesting replanning.</REASONING>"
-            )
-        )
-        print(warning.content)
-        return {
-            "messages": state["messages"] + [warning],
-            "reasoning_done": False,
-        }
-
-    execution_instruction = HumanMessage(
-        content=(
-            "Execute the planned action now. If a tool is required, call it with the "
-            "correct arguments. After success, respond with STEP COMPLETE. If inputs are "
-            "missing, explain the issue in <REASONING> without new tool calls."
-        )
-    )
-    stack = [system_message] + state["messages"] + [execution_instruction]
-    execution_response = llm_with_tools.invoke(stack)
-
-    if execution_response.tool_calls:
-        tool_names = ", ".join(call["name"] for call in execution_response.tool_calls)
-        log_stage("TOOL CALL", subtitle=f"{current_step_info.id} → {tool_names}", icon="🛠️")
-        print(execution_response.tool_calls)
+    
     else:
-        log_stage("EXECUTION OUTPUT", subtitle=current_step_info.id, icon="🛠️")
-        if execution_response.content:
-            print(execution_response.content)
+        tool_prompt = f"""
+        Now execute the tool for step {current_step + 1}.
+        
+        You have already done the reasoning. Now call the appropriate tool with the correct parameters.
+        Available file paths: {list(state.get("file_contents", {}).keys())}\n
+        IMPORTANT NOTE: IF YOU DECIDED TO USE safe_code_run, MAKE SURE TO FINISH CALCULATIONS WITH print() or saving to a variable NAMED 'result' so that the output can be captured!
+        AVAILABLE TOOLS: {', '.join([tool.name for tool in TOOLS])}
+        """ 
 
-    advance = False
-    if execution_response.tool_calls:
-        advance = True
-    elif execution_response.content and (
-        "STEP COMPLETE" in execution_response.content or "<FINAL_ANSWER>" in execution_response.content
-    ):
-        advance = True
-
-    next_step = current_step + 1 if advance and current_step < total_steps else current_step
-
-    return {
-        "messages": state["messages"] + [execution_response],
-        "current_step": next_step,
-        "reasoning_done": False,
-    }
-
+        sys_msg = SystemMessage(content=tool_prompt)
+        stack = [sys_msg] + state["messages"]  # Берем последние сообщения включая reasoning
+        
+        # Используем модель С инструментами для выполнения
+        step = llm_with_tools.invoke(stack)
+        print("=== TOOL EXECUTION ===")
+        print(f"Tool calls: {step.tool_calls}")
+        
+        return {
+            "messages": state["messages"] + [step],
+            "current_step": current_step + 1 if step.tool_calls else current_step,
+            "reasoning_done": False  # Сбрасываем для следующего шага
+        }
+    
 def should_continue(state : AgentState) -> bool:
     
     last_message = state["messages"][-1]
@@ -235,67 +269,48 @@ def should_continue(state : AgentState) -> bool:
     plan = state.get("plan", None)
     current_step = state.get("current_step", 0)
 
-    if plan and current_step >= len(plan.steps):
-        return "final_answer"
-
-
+    #ПРИОРИТЕТ 1: Если есть tool_calls - выполняем их
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "tools"
+    
+    # ПРИОРИТЕТ 2: Явный сигнал завершения
     if hasattr(last_message, "content") and "<FINAL_ANSWER>" in last_message.content:
         return "final_answer"
-    elif hasattr(last_message, "tool_calls") and last_message.tool_calls:
-        return "tools" 
-    elif not reasoning_done and hasattr(last_message, 'content') and "<REASONING>" in last_message.content:
+    
+    # ПРИОРИТЕТ 3: Логика reasoning/execution
+    if not reasoning_done and hasattr(last_message, 'content') and "<REASONING>" in last_message.content:
         # Reasoning выполнен, но инструменты еще не вызваны
         return "agent"
     elif reasoning_done:
         # Reasoning выполнен, теперь нужно вызвать инструменты
         return "agent"
-    else:
+    elif not reasoning_done:
         # Нужно сделать reasoning
         return "agent"
+    
+    # ПРИОРИТЕТ 4: Проверяем завершение плана (только если нет активных tool_calls)
+    if plan and current_step >= len(plan.steps):
+        return "final_answer"
+    
+    # По умолчанию продолжаем выполнение
+    return "agent"
 
 # 6. Добавить отладочную информацию в TOOL_NODE
 class DebuggingToolNode(ToolNode):
     def __init__(self, tools):
         super().__init__(tools)
-
-    def __call__(self, state):
-        log_stage("TOOL NODE", subtitle="Dispatching tool calls", icon="🛠️")
-        try:
-            result = super().__call__(state)
-            log_stage("TOOL NODE", subtitle="Tool execution completed", icon="✅")
-            return result
-        except Exception as exc:
-            log_stage("TOOL ERROR", subtitle=f"{type(exc).__name__}: {exc}", icon="❌")
-            messages = state.get("messages", [])
-            last_message = messages[-1] if messages else None
-            tool_calls = getattr(last_message, "tool_calls", []) if last_message else []
-
-            error_messages = []
-            for call in tool_calls:
-                error_messages.append(
-                    ToolMessage(
-                        content=f"ERROR: {type(exc).__name__}: {exc}",
-                        tool_call_id=call.get("id") or "unknown_call",
-                        name=call.get("name"),
-                    )
-                )
-
-            if not error_messages:
-                error_messages.append(
-                    ToolMessage(
-                        content=f"ERROR: {type(exc).__name__}: {exc}",
-                        tool_call_id="unknown_call",
-                    )
-                )
-
-            return {"messages": messages + error_messages}
     
-
+    def __call__(self, state):
+        print("=== TOOL EXECUTION STARTED ===")
+        result = super().__call__(state)
+        print("=== TOOL EXECUTION COMPLETED ===")
+        return result
+    
 
 def enhanced_finalizer(state: AgentState) -> AgentState:
     """Generate comprehensive execution report for critic evaluation."""
-    log_stage("FINALIZER", subtitle="Compiling execution report", icon="📄")
-
+    print("=== GENERATING EXECUTION REPORT ===")
+    
     # Extract tool execution information
     tools_executed = []
     data_sources = []
@@ -320,22 +335,20 @@ def enhanced_finalizer(state: AgentState) -> AgentState:
     plan = state.get("plan")
     approach_used = "Direct execution"
     assumptions_made = []
-    plan_overview = ""
-
+    
     if plan:
-        approach_used = f"{plan.task_type} plan – {plan.summary}"
+        approach_used = f"{plan.task_type} approach with {len(plan.steps)} steps"
         assumptions_made = plan.assumptions
-        plan_overview = format_plan_overview(plan)
     
     # Generate structured report (КОСТЫЛЬ ЗДЕСЬ!)
     report_generator_prompt = f"""
     Generate a comprehensive execution report for the following query processing:
 
     ORIGINAL QUERY: {state['query']}
-
+    
     EXECUTION CONTEXT:
     - Complexity Level: {state.get('complexity_assessment', {}).level}
-    - Plan Used: {plan_overview if plan_overview else 'direct response'}
+    - Plan Used: {plan if plan else {}}
     - Tools Executed: {tools_executed}
     - Available Files: {list(state.get('file_contents', {}).keys())}
     
@@ -362,18 +375,13 @@ def enhanced_finalizer(state: AgentState) -> AgentState:
         HumanMessage(content="Generate the execution report.")
     ])
     
-    log_key_values(
-        [
-            ("confidence", execution_report.confidence_level),
-            ("findings", str(len(execution_report.key_findings))),
-            ("sources", str(len(execution_report.data_sources))),
-        ]
-    )
-
+    print(f"Report generated - Confidence: {execution_report.confidence_level}")
+    print(f"Key findings: {len(execution_report.key_findings)}")
+    print(f"Data sources: {len(execution_report.data_sources)}")
+    
     # Format final answer for user
     formatted_answer = format_final_answer(execution_report, state.get('complexity_assessment', {}))
-    log_stage("FINAL ANSWER PREVIEW", icon="📬")
-    print(formatted_answer)
+    print(execution_report)
     return {
         "execution_report": execution_report,
         "final_answer": formatted_answer
@@ -382,25 +390,23 @@ def enhanced_finalizer(state: AgentState) -> AgentState:
 
 def simple_executor(state: AgentState) -> AgentState:
     """Handle simple queries directly without planning."""
-    log_stage("SIMPLE EXECUTION", subtitle="Handling low-complexity query", icon="⚡")
-
+    print("=== SIMPLE EXECUTION ===")
+    
     # For simple queries, use the LLM with tools directly
     simple_prompt = f"""
     Answer this simple query directly and efficiently: {state['query']}
-
-    Stay factual, cite tools only if you actually call them, and avoid inventing files or URLs.
-    Known files: {list(state.get('file_contents', {}).keys())}
-    If no tool is required, respond immediately with the final answer.
+    
+    You have access to tools if needed, but try to answer directly when possible.
+    If you need files, they are available at: {list(state.get('file_contents', {}).keys())}
+    
+    Provide a clear, concise answer.
     """
-
+    
     response = llm_with_tools.invoke([
         SystemMessage(content=simple_prompt),
         HumanMessage(content=state['query'])
     ])
     
-    log_stage("SIMPLE EXECUTION OUTPUT", icon="📬")
-    print(response.content)
-
     return {
         "messages": state["messages"] + [response],
         "final_answer": response.content
@@ -419,8 +425,8 @@ def should_use_planning(state: AgentState) -> str:
 
 def critic_evaluator(state: AgentState) -> AgentState:
     """Enhanced critic that evaluates execution reports."""
-    log_stage("CRITIC", subtitle="Evaluating execution report", icon="🔍")
-
+    print("=== ENHANCED ANSWER CRITIQUE ===")
+    
     report = state.get("execution_report")
     critic_llm = llm.with_structured_output(CritiqueFeedback)
     
@@ -440,22 +446,15 @@ def critic_evaluator(state: AgentState) -> AgentState:
         HumanMessage(content="Evaluate this execution report thoroughly.")
     ])
     
-    log_key_values(
-        [
-            ("quality", f"{critique.quality_score}/10"),
-            ("complete", str(critique.is_complete)),
-            ("accurate", str(critique.is_accurate)),
-        ]
-    )
-
+    print(f"Quality Score: {critique.quality_score}/10")
+    print(f"Complete: {critique.is_complete}")
+    print(f"Accurate: {critique.is_accurate}")
+    
     if critique.errors_found:
-        log_stage("CRITIC ISSUES", icon="⚠️")
-        for issue in critique.errors_found:
-            print(f" - {issue}")
-
+        print(f"Issues found: {critique.errors_found}")
+    
     if critique.needs_replanning:
-        log_stage("CRITIC REPLAN", subtitle="Replanning requested", icon="♻️")
-        print(critique.replan_instructions)
+        print(f"Replanning needed: {critique.replan_instructions}")
     
     return {
         "critique_feedback": critique,
@@ -469,63 +468,64 @@ def should_replan(state: AgentState) -> str:
     critique = state.get("critique_feedback")
     iteration_count = state.get("iteration_count", 0)
     max_iterations = state.get("max_iterations", 3)
+    
 
-    subtitle = f"Iteration {iteration_count}/{max_iterations}"
-    log_stage("REPLAN DECISION", subtitle=subtitle, icon="🧭")
-    if critique:
-        log_key_values(
-            [
-                ("quality", str(critique.quality_score)),
-                ("needs_replanning", str(critique.needs_replanning)),
-            ]
-        )
+    print(f"=== REPLAN DECISION ===")
+    print(f"Iteration: {iteration_count}/{max_iterations}")
+    print(f"Quality score: {critique.quality_score if critique else 'N/A'}")
+    print(f"Needs replanning: {critique.needs_replanning if critique else 'N/A'}")
 
     if not critique:
         return "end"
-
+    
     # Stop if max iterations reached
     if iteration_count >= max_iterations:
-        log_stage("REPLAN DECISION", subtitle="Max iterations reached", icon="🛑")
+        print(f"Max iterations ({max_iterations}) reached. Accepting current answer.")
         return "end"
-
+    
     # Accept if quality is good enough
     if critique.quality_score >= 7 or not critique.needs_replanning:
-        log_stage("REPLAN DECISION", subtitle="Accepting current answer", icon="✅")
+        print("Quality acceptable, ending execution")
         return "end"
-
+    
     # Replan if quality is poor and we haven't exceeded max iterations
     if critique.needs_replanning and iteration_count < max_iterations:
-        log_stage("REPLAN DECISION", subtitle="Triggering replanner", icon="♻️")
+        print("Replanning due to critic feedback...")
         return "replan"
-
+    
     return "end"
 
 def replanner(state: AgentState) -> AgentState:
     """Create a revised plan based on critic feedback."""
-    log_stage("REPLANNER", subtitle="Adjusting plan based on feedback", icon="♻️")
-
+    print("=== REPLANNING ===")
+    
     critique = state["critique_feedback"]
     previous_plan = state.get("plan")
-
-    previous_summary = previous_plan.summary if previous_plan else "no previous plan"
-    issues = ", ".join(critique.errors_found) if critique.errors_found else "none"
-    improvements = ", ".join(critique.suggested_improvements) if critique.suggested_improvements else "none"
-    extra_context = (
-        f"Replanning requested by critic. Previous plan summary: {previous_summary}. "
-        f"Critic score: {critique.quality_score}/10. Issues: {issues}. "
-        f"Improvements to address: {improvements}. Specific instructions: "
-        f"{critique.replan_instructions or 'none'}"
-    )
-
-    replan_prompt = _build_planner_prompt(state, extra_context=extra_context)
-
+    
+    replan_prompt = f"""
+    {SYSTEM_PROMPT_PLANNER}
+    
+    REPLANNING CONTEXT:
+    Original Query: {state['query']}
+    Previous Plan: {previous_plan if previous_plan else {}}
+    
+    CRITIC FEEDBACK:
+    - Quality Score: {critique.quality_score}/10
+    - Issues Found: {critique.errors_found}
+    - Missing Elements: {critique.missing_elements}
+    - Improvement Suggestions: {critique.suggested_improvements}
+    - Specific Instructions: {critique.replan_instructions}
+    
+    Create a REVISED plan that addresses these issues. Focus on fixing the identified problems.
+    """
+    
     revised_plan = planner_llm.invoke([
         SystemMessage(content=replan_prompt),
         HumanMessage(content="Create a revised plan based on the feedback.")
     ])
-
-    display_plan(revised_plan)
-
+    
+    print("Plan revised based on critic feedback")
+    
     # Очищаем историю сообщений от неполных tool_calls
     current_messages = state.get("messages", [])
     cleaned_messages = clean_message_history(current_messages)
@@ -540,12 +540,8 @@ def replanner(state: AgentState) -> AgentState:
                 isinstance(msg, HumanMessage)):
                 essential_messages.append(msg)
     
-    log_stage(
-        "REPLANNER",
-        subtitle=f"Cleaned history: {len(current_messages)} → {len(essential_messages)}",
-        icon="🧹",
-    )
-
+    print(f"Cleaned message history: {len(current_messages)} -> {len(essential_messages)} messages")
+    
     return {
         "plan": revised_plan,
         "current_step": 0,
@@ -557,24 +553,21 @@ def replanner(state: AgentState) -> AgentState:
 
 def complexity_assessor(state: AgentState) -> AgentState:
     """Assess query complexity and determine if planning is needed."""
-    log_stage("COMPLEXITY", subtitle="Assessing task difficulty", icon="📊")
-
+    print("=== COMPLEXITY ASSESSMENT ===")
+    
     complexity_llm = llm.with_structured_output(ComplexityLevel)
-
+    
     assessment_message = [
         SystemMessage(content=COMPLEXITY_ASSESSOR_PROMPT.strip()),
         HumanMessage(content=f"Query: {state['query']}")
     ]
-
+    
     assessment = complexity_llm.invoke(assessment_message)
-    log_key_values(
-        [
-            ("level", assessment.level),
-            ("needs_planning", str(assessment.needs_planning)),
-            ("reasoning", assessment.reasoning),
-        ]
-    )
-
+    
+    print(f"Complexity: {assessment.level}")
+    print(f"Needs planning: {assessment.needs_planning}")
+    print(f"Reasoning: {assessment.reasoning}")
+    
     return {
         "complexity_assessment": assessment,
         "messages": state["messages"] + assessment_message

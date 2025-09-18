@@ -1,10 +1,9 @@
 from typing import Iterable, Optional
-
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from schemas import ComplexityLevel, ExecutionReport, PlannerPlan
 from prompts.prompts import COMPLEXITY_ASSESSOR_PROMPT
-from config import llm
 from state import AgentState
 
 def log_stage(title: str, subtitle: Optional[str] = None, icon: str = "🚀") -> None:
@@ -52,6 +51,8 @@ def display_plan(plan: PlannerPlan) -> None:
         print(f"   {step.id} → {step.goal}")
         if step.tool:
             print(f"      tool: {step.tool}")
+        else:
+            print("      tool: (none)")
         if step.inputs:
             print(f"      inputs: {step.inputs}")
         print(f"      expected: {step.expected_result}")
@@ -138,7 +139,7 @@ def complexity_assessor(state: AgentState) -> AgentState:
     """Assess query complexity and determine if planning is needed."""
     print("=== COMPLEXITY ASSESSMENT ===")
     
-    complexity_llm = llm.with_structured_output(ComplexityLevel)
+    complexity_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.25).with_structured_output(ComplexityLevel)
     
     assessment_message = [
         SystemMessage(content=COMPLEXITY_ASSESSOR_PROMPT.strip()),

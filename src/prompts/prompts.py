@@ -24,7 +24,7 @@ Return a single JSON object with this structure:
 }}
 
 Ground rules:
-- Prefer 1–3 steps. Only add a step if it changes the outcome.
+- Prefer 1–3 steps. Only add a step if it changes the outcome. For complex tasks, up to 5-7 steps is okay.
 - Use tool names exactly as listed. If no tool is needed, set "tool": null.
 - Never assume files or URLs exist—plan to search/download before analysing.
 - Skip download steps when the required file is already provided.
@@ -130,5 +130,5 @@ Confidence: {confidence}
 Limitations: {limitations}
 Final Answer: {answer}
 
-Provide detailed critique focusing on what works well and what could be improved.
+Provide detailed critique focusing on what works well and what could be improved. REMEMBER: if the task is enough simple, just say "NO CRITIC NEEDED".
 """
