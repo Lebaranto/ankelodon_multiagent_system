@@ -1,0 +1,70 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+.pipenv/
+Pipfile.lock
+
+# Data and large files (your datasets)
+data/*.xlsx
+data/*.pdf
+data/*.csv  # Если большие; иначе удали
+data/*.docx
+output/     # Generated outputs
+
+# Notebooks (if not committing)
+*.ipynb_checkpoints/
+test_*.ipynb  # Тестовые notebooks
+
+# Build/dist
+build/
+dist/
+*.egg
+
+# Testing
+.coverage
+htmlcov/
+.tox/
+.cache/
+
+# Mac
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
