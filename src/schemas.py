@@ -1,6 +1,5 @@
 from typing import List, Optional, Literal
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, Field, field_validator
 
 class ComplexityLevel(BaseModel):
     level: Literal["simple", "moderate", "complex"] = Field(description="Complexity level of the query")
@@ -18,8 +17,6 @@ class CritiqueFeedback(BaseModel):
     needs_replanning: bool = Field(description="Whether the plan should be revised")
     replan_instructions: Optional[str] = Field(default=None, description="Instructions for replanning")
 
-
-
 TaskType = Literal["info", "calc", "table", "doc_qa", "image_qa", "multi_hop"]
 
 class PlanStep(BaseModel):
@@ -30,6 +27,19 @@ class PlanStep(BaseModel):
     expected_result: str = Field(description="How to confirm the step succeeded")
     on_fail: str = Field(default="replan", description="Fallback action if the step fails (replan or stop)")
 
+    @field_validator("tool", mode="before")
+    @classmethod
+    def normalize_tool(cls, value: Optional[str]) -> Optional[str]:
+        """Ensure blank or null-like values are interpreted as no tool."""
+
+        if value is None:
+            return None
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if not cleaned or cleaned.lower() in {"null", "none"}:
+                return None
+            return cleaned
+        return value
 
 class PlannerPlan(BaseModel):
     task_type: TaskType
