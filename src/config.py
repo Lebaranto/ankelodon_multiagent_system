@@ -5,6 +5,8 @@ from langgraph.prebuilt import ToolNode
 from schemas import PlannerPlan
 from utils.utils import log_stage
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
+from dotenv import load_dotenv
+load_dotenv()
 
 config = {"configurable": {"thread_id": "1"}, "recursion_limit" : 50}
 
