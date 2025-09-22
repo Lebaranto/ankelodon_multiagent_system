@@ -101,7 +101,7 @@ def preprocess_files(files: List[str]) -> Dict[str, Dict[str, Any]]:
             info["suggested_tool"] = "analyze_txt_file"
         elif file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
             info["type"] = "image"
-            info["suggested_tool"] = "if its about image itself : analyze_image_file, if its aboutrt content or qa : vision_qa_gemma ONLY"
+            info["suggested_tool"] = "vision_qa_gemma"
         else:
             info["type"] = "unknown"
             info["suggested_tool"] = "analyze_txt_file (fallback)"

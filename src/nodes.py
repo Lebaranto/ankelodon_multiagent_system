@@ -13,7 +13,7 @@ from prompts.prompts import (
     CRITIC_PROMPT,
 )
 
-from config import llm, TOOLS, planner_llm, llm_with_tools
+from config import llm_reasoning, TOOLS, planner_llm, llm_with_tools, llm_deterministic, llm_criticist
 from schemas import PlannerPlan, ComplexityLevel, CritiqueFeedback, ExecutionReport, ToolExecution
 
 from utils.utils import (
@@ -113,6 +113,8 @@ def agent(state: AgentState) -> AgentState:
     current_step = state.get("current_step", 0)
     reasoning_done = state.get("reasoning_done", False)
     plan: Optional[PlannerPlan] = state.get("plan")
+    previous_tool_results = state.get("previous_tool_results", {})
+
     #steps = state["plan"].steps
 
     """
@@ -175,6 +177,15 @@ def agent(state: AgentState) -> AgentState:
     file_contents = state.get("file_contents", {})
     file_list = ", ".join(file_contents.keys()) if file_contents else "none provided"
 
+    # Добавляем информацию о предыдущих результатах (UPDATE)
+    previous_results_context = ""
+    if previous_tool_results:
+        previous_results_context = f"\n\nPREVIOUS CALCULATION RESULTS:\n"
+        for tool_call_id, result in previous_tool_results.items():
+            previous_results_context += f"- {tool_call_id}: {result}\n"
+        previous_results_context += "You can reference these results in your calculations.\n"
+
+
     system_message = SystemMessage(
         content=SYSTEM_EXECUTOR_PROMPT.format(
             plan_summary=plan.summary,
@@ -197,7 +208,7 @@ def agent(state: AgentState) -> AgentState:
             )
         )
         stack = [system_message] + state["messages"] + [instruction]
-        reasoning_response = llm.invoke(stack)
+        reasoning_response = llm_reasoning.invoke(stack) #default llm
         log_stage("REASONING", subtitle=f"{current_step_info.id}", icon="🧠")
         print(reasoning_response.content)
 
@@ -224,12 +235,13 @@ def agent(state: AgentState) -> AgentState:
         Explain what you need to do and why, then end your response.
 
         REASONING IS IMPERATIVE BEFORE ANY TOOL CALLS.
+        FOR MORE COMPLEX UNDERSTANDING -> USE RESULTS AND INSIGHTS FROM PREVIOUS STEPS.
         """
 
         sys_msg = SystemMessage(content = reasoning_prompt)
         stack = [sys_msg] + state["messages"]
 
-        step = llm.invoke(stack)
+        step = llm_reasoning.invoke(stack)
         print("=== REASONING STEP ===")
         print(step.content)
 
@@ -254,6 +266,7 @@ def agent(state: AgentState) -> AgentState:
         # Используем модель С инструментами для выполнения
         step = llm_with_tools.invoke(stack)
         print("=== TOOL EXECUTION ===")
+        print(step)
         print(f"Tool calls: {step.tool_calls}")
         
         return {
@@ -265,9 +278,16 @@ def agent(state: AgentState) -> AgentState:
 def should_continue(state : AgentState) -> bool:
     
     last_message = state["messages"][-1]
+    print(f"=== LAST MESSAGE WAS: {last_message} ===")
     reasoning_done = state.get("reasoning_done", False)
     plan = state.get("plan", None)
     current_step = state.get("current_step", 0)
+
+    print(f"=== SHOULD_CONTINUE DEBUG ===")
+    print(f"Current step: {current_step}")
+    print(f"Plan steps: {len(plan.steps) if plan else 0}")
+    print(f"Reasoning done: {reasoning_done}")
+    print(f"Last message type: {type(last_message).__name__}")
 
     #ПРИОРИТЕТ 1: Если есть tool_calls - выполняем их
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
@@ -368,7 +388,7 @@ def enhanced_finalizer(state: AgentState) -> AgentState:
     Be thorough but concise. This report will be evaluated by a critic for quality assurance.
     """
     
-    report_llm = llm.with_structured_output(ExecutionReport)
+    report_llm = llm_deterministic.with_structured_output(ExecutionReport)
     
     execution_report = report_llm.invoke([
         SystemMessage(content=report_generator_prompt),
@@ -406,11 +426,25 @@ def simple_executor(state: AgentState) -> AgentState:
         SystemMessage(content=simple_prompt),
         HumanMessage(content=state['query'])
     ])
+
+    print("Response generated for simple query.")
     
     return {
         "messages": state["messages"] + [response],
         "final_answer": response.content
     }
+
+def should_use_tools_simple_executor(state: AgentState) -> str:
+    """Decide whether to use tools or answer directly in simple executor."""
+    last_message = state["messages"][-1]
+    
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "tools"
+    
+    if hasattr(last_message, "content") and "<FINAL_ANSWER>" in last_message.content:
+        return "final_answer"
+    
+    return "final_answer"
 
 
 def should_use_planning(state: AgentState) -> str:
@@ -428,7 +462,7 @@ def critic_evaluator(state: AgentState) -> AgentState:
     print("=== ENHANCED ANSWER CRITIQUE ===")
     
     report = state.get("execution_report")
-    critic_llm = llm.with_structured_output(CritiqueFeedback)
+    critic_llm = llm_criticist.with_structured_output(CritiqueFeedback)
     
     critique_prompt = CRITIC_PROMPT.format(
         query=report.query_summary,
@@ -495,7 +529,7 @@ def should_replan(state: AgentState) -> str:
     
     return "end"
 
-def replanner(state: AgentState) -> AgentState:
+def replanner_old(state: AgentState) -> AgentState:
     """Create a revised plan based on critic feedback."""
     print("=== REPLANNING ===")
     
@@ -541,7 +575,11 @@ def replanner(state: AgentState) -> AgentState:
                 essential_messages.append(msg)
     
     print(f"Cleaned message history: {len(current_messages)} -> {len(essential_messages)} messages")
-    
+    print("=== ESSENTIAL MESSAGES ===")
+    print(essential_messages)
+    print("=== AGENT STATE ===")
+    print(state["messages"])
+
     return {
         "plan": revised_plan,
         "current_step": 0,
@@ -550,12 +588,102 @@ def replanner(state: AgentState) -> AgentState:
         "execution_report": None
     }
 
+def replanner(state: AgentState) -> AgentState:
+    """Create a revised plan based on critic feedback."""
+    print("=== REPLANNING ===")
+    
+    critique = state["critique_feedback"]
+    previous_plan = state.get("plan")
+    
+    replan_prompt = f"""
+    {SYSTEM_PROMPT_PLANNER}
+    
+    REPLANNING CONTEXT:
+    Original Query: {state['query']}
+    Previous Plan: {previous_plan if previous_plan else {}}
+    
+    CRITIC FEEDBACK:
+    - Quality Score: {critique.quality_score}/10
+    - Issues Found: {critique.errors_found}
+    - Missing Elements: {critique.missing_elements}
+    - Improvement Suggestions: {critique.suggested_improvements}
+    - Specific Instructions: {critique.replan_instructions}
+    
+    Create a REVISED plan that addresses these issues. Focus on fixing the identified problems.
+    """
+    
+    revised_plan = planner_llm.invoke([
+        SystemMessage(content=replan_prompt),
+        HumanMessage(content="Create a revised plan based on the feedback.")
+    ])
+    
+    print("Plan revised based on critic feedback")
+    
+    # ИСПРАВЛЕНИЕ: Сохраняем важные результаты инструментов
+    current_messages = state.get("messages", [])
+    
+    # Находим полезные результаты инструментов
+    preserved_messages = []
+    tool_results = {}
+    
+    for i, msg in enumerate(current_messages):
+        # Сохраняем системные сообщения и пользовательские запросы
+        if isinstance(msg, (SystemMessage, HumanMessage)):
+            # Фильтруем только исходные запросы, не промпты планировщика
+            if (isinstance(msg, HumanMessage) or 
+                ("complexity" in msg.content.lower() and "assessor" in msg.content.lower())):
+                preserved_messages.append(msg)
+        
+        # Сохраняем успешные результаты инструментов
+        elif isinstance(msg, ToolMessage) and msg.content and msg.content.strip():
+            # Проверяем, что это полезный результат
+            try:
+                # Если результат можно преобразовать в число - это вычисление
+                float(msg.content.strip())
+                preserved_messages.append(msg)
+                tool_results[msg.tool_call_id] = msg.content
+                
+                # Также нужно сохранить соответствующий AIMessage с tool_call
+                for j in range(i-1, -1, -1):
+                    if (isinstance(current_messages[j], AIMessage) and 
+                        hasattr(current_messages[j], 'tool_calls') and
+                        current_messages[j].tool_calls):
+                        for tool_call in current_messages[j].tool_calls:
+                            if tool_call['id'] == msg.tool_call_id:
+                                if current_messages[j] not in preserved_messages:
+                                    preserved_messages.insert(-1, current_messages[j])
+                                break
+                        break
+            except (ValueError, AttributeError):
+                # Если не число, но содержательный результат, тоже сохраняем
+                if len(msg.content.strip()) > 1: # Минимальная длина для сохранения
+                    preserved_messages.append(msg)
+    
+    print(f"Preserved {len(tool_results)} tool results")
+    print(f"Cleaned message history: {len(current_messages)} -> {len(preserved_messages)} messages")
+    
+    # Добавляем контекст о доступных результатах
+    if tool_results:
+        context_msg = HumanMessage(
+            content=f"Previous calculation results available: {tool_results}"
+        )
+        preserved_messages.append(context_msg)
+
+    return {
+        "plan": revised_plan,
+        "current_step": 0,
+        "reasoning_done": False,
+        "messages": preserved_messages,
+        "execution_report": None,
+        # Сохраняем важную информацию о предыдущих вычислениях
+        "previous_tool_results": tool_results
+    }
 
 def complexity_assessor(state: AgentState) -> AgentState:
     """Assess query complexity and determine if planning is needed."""
     print("=== COMPLEXITY ASSESSMENT ===")
     
-    complexity_llm = llm.with_structured_output(ComplexityLevel)
+    complexity_llm = llm_deterministic.with_structured_output(ComplexityLevel)
     
     assessment_message = [
         SystemMessage(content=COMPLEXITY_ASSESSOR_PROMPT.strip()),

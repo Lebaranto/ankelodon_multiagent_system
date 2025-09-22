@@ -19,4 +19,5 @@ class AgentState(MessagesState):
     iteration_count :int
     max_iterations: int
     execution_report : ExecutionReport
+    previous_tool_results: Dict[str, str]  # НОВОЕ ПОЛЕ для сохранения результатов
 

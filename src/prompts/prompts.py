@@ -15,38 +15,39 @@ TASK BREAKDOWN EXAMPLES:
 Example 1: "Analyze sales data and calculate growth rates"
 {{
   "steps": [
-    {{"id": "s1", "goal": "Load and examine the sales data file", "tool": "file_reader"}},
-    {{"id": "s2", "goal": "Calculate monthly growth rates using Python", "tool": "code_executor"}},
-    {{"id": "s3", "goal": "Generate summary statistics and trends", "tool": "code_executor"}}
+    {{"id": "s1", "goal": "Load and examine the sales data file", "tool": "analyze_(csv, docx, pdf etc.)_file"}},
+    {{"id": "s2", "goal": "Calculate monthly growth rates using Python", "tool": "safe_code_run"}},
+    {{"id": "s3", "goal": "Generate summary statistics and trends", "tool": "safe_code_run"}}
   ]
-}}
+}}ф
 
 Example 2: "Research recent AI developments and summarize key trends"
 {{
   "steps": [
     {{"id": "s1", "goal": "Search for recent AI news and developments", "tool": "web_search"}},
-    {{"id": "s2", "goal": "Fetch detailed content from top 3-5 relevant articles", "tool": "web_fetch"}},
-    {{"id": "s3", "goal": "Analyze and synthesize key trends from gathered information", "tool": null}}
+    {{"id": "s2", "goal": "Download relevant articles", "tool": "ddownload_file_from_url"}},
+    {{"id": "s3", "goal": "Extract and organize key information from articles", "tool": "analyze_(csv, docx, pdf etc.)_file"}},
+    {{"id": "s4", "goal": "Analyze and synthesize key trends from gathered information", "tool": null}}
   ]
 }}
 
 Example 3: "Compare performance metrics between two datasets"
 {{
   "steps": [
-    {{"id": "s1", "goal": "Load first dataset and examine structure", "tool": "file_reader"}},
-    {{"id": "s2", "goal": "Load second dataset and examine structure", "tool": "file_reader"}},
-    {{"id": "s3", "goal": "Calculate statistical metrics for both datasets using code", "tool": "code_executor"}},
-    {{"id": "s4", "goal": "Perform statistical comparison and significance testing", "tool": "code_executor"}}
+    {{"id": "s1", "goal": "Load first dataset and examine structure", "tool": "analyze_(csv, docx, pdf etc.)_file"}},
+    {{"id": "s2", "goal": "Load second dataset and examine structure", "tool": "analyze_(csv, docx, pdf etc.)_file"}},
+    {{"id": "s3", "goal": "Calculate statistical metrics for both datasets using code", "tool": "safe_code_run"}},
+    {{"id": "s4", "goal": "Perform statistical comparison and significance testing", "tool": "safe_code_run"}}
   ]
 }}
 
 Example 4: "Create a budget analysis from expense data"
 {{
   "steps": [
-    {{"id": "s1", "goal": "Load expense data and validate format", "tool": "file_reader"}},
-    {{"id": "s2", "goal": "Calculate category totals and percentages using code", "tool": "code_executor"}},
-    {{"id": "s3", "goal": "Generate budget variance analysis and projections", "tool": "code_executor"}},
-    {{"id": "s4", "goal": "Create visualization of spending patterns", "tool": "code_executor"}}
+    {{"id": "s1", "goal": "Load expense data and validate format", "tool": "analyze_(csv, docx, pdf etc.)_file"}},
+    {{"id": "s2", "goal": "Calculate category totals and percentages using code", "tool": "safe_code_run"}},
+    {{"id": "s3", "goal": "Generate budget variance analysis and projections", "tool": "safe_code_run"}},
+    {{"id": "s4", "goal": "Create visualization of spending patterns", "tool": "safe_code_run"}}
   ]
 }}
 
@@ -69,7 +70,7 @@ Return a single JSON object with this structure:
 }}
 
 Ground rules:
-- Prefer 2-4 steps for most tasks. Single steps only for truly trivial queries.
+- Prefer 2-4 steps for most tasks. Single steps only for truly trivial queries. Calculation tasks must use tools always.
 - Break down complex tasks into logical components - don't try to solve everything at once
 - Use tool names exactly as listed. If no tool is needed, set "tool": null.
 - Never assume files or URLs exist—plan to search/download before analysing.
@@ -94,10 +95,10 @@ Available tools: {tool_catalogue}
 Known local files: {file_list}
 
 CRITICAL COMPUTATION RULE: You MUST use tools for ANY numerical calculation, counting, or mathematical operation. This includes:
-- Simple arithmetic (use calculator tool)
-- Data analysis and statistics (use code execution)
-- Counting items, rows, or occurrences (use code)
-- Percentage calculations (use calculator/code)
+- Simple arithmetic (use tools add, subtract, multiply, divide, power)
+- Data analysis and statistics (use safe_code_run)
+- Counting items, rows, or occurrences (use safe_code_run)
+- Percentage calculations (use add, subtract, multiply, divide, power/safe_code_run)
 - Any mathematical transformation or formula application
 
 NEVER perform manual calculations or provide estimated numbers.
@@ -121,6 +122,8 @@ COMPLEXITY LEVELS:
 1. SIMPLE: Direct questions that can be answered immediately without tools or with single tool use
    - Examples: "What is photosynthesis?", "Define machine learning", "What's the capital of France?"
    - NOTE: Simple math like "2+2" still requires calculator tool but counts as SIMPLE
+
+   !ALSO: It can be a logical reasoning or explanation task that does not require tools.
    
 2. MODERATE: Questions requiring 2-4 tool calls or basic multi-step analysis
    - Examples: "Search for recent news about AI", "Analyze this CSV file for trends", "Calculate ROI from this data"
@@ -129,6 +132,8 @@ COMPLEXITY LEVELS:
 3. COMPLEX: Multi-step problems requiring planning, multiple tools, and sophisticated reasoning
    - Examples: "Research market trends and create investment strategy", "Analyze multiple data sources and predict outcomes"
    - "Build comprehensive report from various inputs", "Multi-stage data processing with validation"
+
+MOST OF THE LOGICAL TASKS ARE SIMPLE, UNLESS THEY REQUIRE TOOLS.
 
 ASSESSMENT CRITERIA:
 - Number of distinct steps likely needed (1 = Simple, 2-4 = Moderate, 5+ = Complex)

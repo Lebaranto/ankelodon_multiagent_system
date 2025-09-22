@@ -91,7 +91,7 @@ def _child_exec(payload: Dict[str, Any], queue: mp.Queue):
     safe_names = [
         "abs","all","any","bool","dict","float","int","len","list","max","min",
         "range","str","sum","print","enumerate","zip","map","filter","sorted",
-        "reversed","complex","pow","divmod"
+        "reversed","complex","pow","divmod", "round", "next", "set", "tuple", "type", "isinstance", "issubclass",
     ]
     safe_builtins = {n: getattr(builtins, n) for n in safe_names}
 

@@ -156,3 +156,9 @@ def complexity_assessor(state: AgentState) -> AgentState:
         "complexity_assessment": assessment,
         "messages": state["messages"] + assessment_message
     }
+
+
+def trim(s: str, max_len: int = 10_000) -> str:
+    if s and len(s) > max_len:
+        return s[:max_len] + "... [truncated]"
+    return s
