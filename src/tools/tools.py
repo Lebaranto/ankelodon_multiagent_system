@@ -6,6 +6,8 @@ import base64
 import tldextract
 import tempfile
 from urllib.parse import urlparse
+from langchain_tavily import TavilyExtract
+from youtube_transcript_api import YouTubeTranscriptApi
 import io
 import pandas as pd
 from typing import List, Optional, Dict, Any
@@ -18,6 +20,7 @@ from langchain_community.document_loaders import ArxivLoader
 from langchain_community.document_loaders import WikipediaLoader
 from PIL import ImageDraw, ImageFont, ImageEnhance, ImageFilter
 from utils.image_processing import *
+import re
 
 def _exif_dict(img: Image.Image) -> dict:
     try:
@@ -36,6 +39,7 @@ def _clip(text: str | None, n: int) -> str:
         return ""
     text = text.strip()
     return (text[: n - 1] + "…") if len(text) > n else text
+
 
 
 def _parse_dt(v) -> Optional[str]:
@@ -360,6 +364,35 @@ def arxiv_search(
         return json.dumps({"error": str(e), "query": query, "provider": "arxiv"})
     
 
+@tool
+def web_extract(urls : List[str]) -> str:
+    """
+    Extract text content from web pages using TavilyExtract.
+    Returns JSON with {url, title, text, images?} for each URL.
+    """
+
+    tool = TavilyExtract(
+    extract_depth="basic",
+    include_images=False,
+)
+    results = tool.invoke(urls)
+    return json.dumps(results)
+
+@tool
+def extract_youtube_transcript(url: str, chars: int = 10_00) -> str:
+    """
+    Fetch full YouTube transcript (first *chars* characters).
+    """
+
+    video_id_match = re.search(r"[?&]v=([A-Za-z0-9_\-]{11})", url)
+    if not video_id_match:
+        return "yt_error:id_not_found"
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id_match.group(1))
+        text = " ".join(piece["text"] for piece in transcript)
+        return text[:chars]
+    except Exception as exc:
+        return f"yt_error:{exc}"
 
 #----------------------------------------------MATH TOOLS------------------------------------------------#
     

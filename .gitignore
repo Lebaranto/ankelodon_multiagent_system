@@ -11,13 +11,13 @@ __pycache__/
 venv/
 env/
 .venv/
-
+D:/ankelodon_multiagent_system/questions_20_gaia.json
 # IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
-
+data/
 # OS
 .DS_Store
 .DS_Store?
