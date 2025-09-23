@@ -373,6 +373,7 @@ def enhanced_finalizer(state: AgentState) -> AgentState:
     # Format final answer for user
     formatted_answer = format_final_answer(execution_report, state.get('complexity_assessment', {}))
     #print(execution_report)
+    print(f"FINAL ANSWER FOR EVALUATOR: {execution_report.final_answer}")
     return {
         "execution_report": execution_report,
         "final_answer": formatted_answer
