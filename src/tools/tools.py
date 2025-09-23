@@ -19,6 +19,7 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_community.document_loaders import ArxivLoader
 from langchain_community.document_loaders import WikipediaLoader
 from PIL import ImageDraw, ImageFont, ImageEnhance, ImageFilter
+from langchain_community.document_loaders import AssemblyAIAudioTranscriptLoader
 from utils.image_processing import *
 import re
 
@@ -913,3 +914,18 @@ def download_file_from_url(url: str, filename: Optional[str] = None) -> str:
         return f"File downloaded to {filepath}. You can read this file to process its contents."
     except Exception as e:
         return f"Error downloading file: {str(e)}"
+
+
+
+@tool
+def transcribe_audio(audio_file: str) -> str:
+    """
+    Transcribe an audio file (URL or local path) using AssemblyAI and return the transcript text.
+    """
+    try:
+        loader = AssemblyAIAudioTranscriptLoader(file_path=audio_file)
+        docs = loader.load()
+        # возвращаем только текст
+        return docs[0].page_content if docs else "No transcription result."
+    except Exception as e:
+        return f"transcribe_error:{str(e)}"

@@ -15,7 +15,7 @@ TOOLS = [download_file_from_url, web_search,
          arxiv_search, wiki_search, add, subtract, multiply, divide, 
          power, analyze_excel_file, analyze_csv_file, analyze_docx_file, 
          analyze_pdf_file, analyze_txt_file, 
-         vision_qa_gemma, safe_code_run, web_extract,extract_youtube_transcript]
+         vision_qa_gemma, safe_code_run, web_extract,extract_youtube_transcript, transcribe_audio]
 
 
 TOOL_NODE = ToolNode(TOOLS)
