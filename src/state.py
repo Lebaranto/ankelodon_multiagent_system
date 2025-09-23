@@ -21,4 +21,5 @@ class AgentState(MessagesState):
     execution_report : ExecutionReport
     previous_tool_results: Dict[str, str]  # НОВОЕ ПОЛЕ для сохранения результатов
     previous_final_answer: str  # НОВОЕ ПОЛЕ для сохранения предыдущих окончательных ответов
+    critic_replan : bool # НОВОЕ ПОЛЕ для указания, был ли выполнен реплан на основе критики
 

@@ -107,6 +107,12 @@ def preprocess_files(files: List[str]) -> Dict[str, Dict[str, Any]]:
         elif file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
             info["type"] = "image"
             info["suggested_tool"] = "vision_qa_gemma"
+        elif file_ext in [".mp3"]:
+            info["type"] = "audio"
+            info["suggested_tool"] = "transcribe_audio"
+        elif file_ext in [".mp4"]:
+            info["type"] = "video"
+            info["suggested_tool"] = "video_qa_gemma"
         else:
             info["type"] = "unknown"
             info["suggested_tool"] = "analyze_txt_file (fallback)"

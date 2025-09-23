@@ -474,12 +474,16 @@ def should_replan(state: AgentState) -> str:
     critique = state.get("critique_feedback")
     iteration_count = state.get("iteration_count", 0)
     max_iterations = state.get("max_iterations", 3)
-    
+    activator = state.get("critic_replan", False)
 
     print(f"=== REPLAN DECISION ===")
     print(f"Iteration: {iteration_count}/{max_iterations}")
     print(f"Quality score: {critique.quality_score if critique else 'N/A'}")
     print(f"Needs replanning: {critique.needs_replanning if critique else 'N/A'}")
+
+    #для деактивации линии перепланировки, если это не нужно
+    if not activator:
+        return "end"
 
     if not critique:
         return "end"

@@ -6,6 +6,7 @@ from schemas import PlannerPlan
 from utils.utils import log_stage
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
 from tools.youtube_transcript import extract_youtube_transcript
+from tools.video_analyzer import video_qa_gemma
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -15,7 +16,7 @@ TOOLS = [download_file_from_url, web_search,
          arxiv_search, wiki_search, add, subtract, multiply, divide, 
          power, analyze_excel_file, analyze_csv_file, analyze_docx_file, 
          analyze_pdf_file, analyze_txt_file, 
-         vision_qa_gemma, safe_code_run, web_extract,extract_youtube_transcript, transcribe_audio]
+         vision_qa_gemma, safe_code_run, web_extract,extract_youtube_transcript, transcribe_audio, video_qa_gemma]
 
 
 TOOL_NODE = ToolNode(TOOLS)
