@@ -13,7 +13,7 @@ from prompts.prompts import (
     CRITIC_PROMPT,
 )
 
-from config import llm_reasoning, TOOLS, planner_llm, llm_with_tools, llm_deterministic, llm_criticist, llm_simple_executor, llm_simple_with_tools
+from config import llm_reasoning, TOOLS, planner_llm, llm_with_tools, llm_deterministic, llm_criticist, llm_simple_executor, llm_simple_with_tools, finalizer_llm
 from schemas import PlannerPlan, ComplexityLevel, CritiqueFeedback, ExecutionReport, ToolExecution
 
 from utils.utils import (
@@ -359,7 +359,7 @@ def enhanced_finalizer(state: AgentState) -> AgentState:
     Be thorough but concise. This report will be evaluated by a critic for quality assurance.
     """
     
-    report_llm = llm_deterministic.with_structured_output(ExecutionReport)
+    report_llm = finalizer_llm.with_structured_output(ExecutionReport) #default llm_deterministic
     
     execution_report = report_llm.invoke([
         SystemMessage(content=report_generator_prompt),

@@ -365,34 +365,33 @@ def arxiv_search(
     
 
 @tool
-def web_extract(urls : List[str]) -> str:
+def web_extract(
+    urls: List[str] | str,
+    include_images: bool = False,
+    extract_depth: str = "basic",
+) -> str:
     """
     Extract text content from web pages using TavilyExtract.
-    Returns JSON with {url, title, text, images?} for each URL.
+
+    🔹 Input: {"urls": str | List[str]}
+        - Example: web_extract.invoke({"urls": ["https://python.langchain.com/docs/introduction/"]})
+    🔹 Output: JSON string with {url, title, text, images?}
+
+    Options:
+        include_images (bool) – add image URLs if True
+        extract_depth (str) – "basic" (default) or "advanced"
     """
+    # нормализуем вход
+    if isinstance(urls, str):
+        urls = [urls]
 
     tool = TavilyExtract(
-    extract_depth="basic",
-    include_images=False,
-)
-    results = tool.invoke(urls)
+        extract_depth=extract_depth,
+        include_images=include_images,
+    )
+    # ВАЖНО: .invoke ждёт словарь по схеме TavilyExtractInput
+    results = tool.invoke({"urls": urls})
     return json.dumps(results)
-
-@tool
-def extract_youtube_transcript(url: str, chars: int = 10_00) -> str:
-    """
-    Fetch full YouTube transcript (first *chars* characters).
-    """
-
-    video_id_match = re.search(r"[?&]v=([A-Za-z0-9_\-]{11})", url)
-    if not video_id_match:
-        return "yt_error:id_not_found"
-    try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id_match.group(1))
-        text = " ".join(piece["text"] for piece in transcript)
-        return text[:chars]
-    except Exception as exc:
-        return f"yt_error:{exc}"
 
 #----------------------------------------------MATH TOOLS------------------------------------------------#
     

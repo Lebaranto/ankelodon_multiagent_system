@@ -5,6 +5,7 @@ from langgraph.prebuilt import ToolNode
 from schemas import PlannerPlan
 from utils.utils import log_stage
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
+from tools.youtube_transcript import extract_youtube_transcript
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -14,7 +15,7 @@ TOOLS = [download_file_from_url, web_search,
          arxiv_search, wiki_search, add, subtract, multiply, divide, 
          power, analyze_excel_file, analyze_csv_file, analyze_docx_file, 
          analyze_pdf_file, analyze_txt_file, 
-         vision_qa_gemma, safe_code_run, web_extract, extract_youtube_transcript]
+         vision_qa_gemma, safe_code_run, web_extract,extract_youtube_transcript]
 
 
 TOOL_NODE = ToolNode(TOOLS)
@@ -28,7 +29,7 @@ llm_with_tools = llm_deterministic.bind_tools(TOOLS)
 llm_reasoning = ChatOpenAI(model="gpt-5-mini", temperature=0.3)
 llm_simple_executor = ChatOpenAI(model="gpt-5-mini", temperature=0.3)
 llm_simple_with_tools = llm_simple_executor.bind_tools(TOOLS)
-
+finalizer_llm = ChatOpenAI(model="gpt-5-mini", temperature=0.5)
 
 
 
