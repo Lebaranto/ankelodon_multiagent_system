@@ -19,7 +19,7 @@ By breaking down tasks into manageable steps and selecting the right tool for ea
 
 ![project logo](docs/images/logo.png)
 
-> *Note: The banner above is a placeholder. You can replace it with your own image placed at `docs/images/ankelodon_banner.png`.*
+> *Note: The banner above is a placeholder. You can replace it with your own image placed at `docs/images/logo.png`.*
 
 ## 🌟 Features
 
