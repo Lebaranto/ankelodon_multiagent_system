@@ -13,7 +13,7 @@ from prompts.prompts import (
     CRITIC_PROMPT,
 )
 
-from config import llm_reasoning, TOOLS, planner_llm, llm_with_tools, llm_deterministic, llm_criticist
+from config import llm_reasoning, TOOLS, planner_llm, llm_with_tools, llm_deterministic, llm_criticist, llm_simple_executor, llm_simple_with_tools
 from schemas import PlannerPlan, ComplexityLevel, CritiqueFeedback, ExecutionReport, ToolExecution
 
 from utils.utils import (
@@ -38,16 +38,14 @@ def _build_planner_prompt(state: AgentState, extra_context: Optional[str] = None
 
 def query_input(state : AgentState) -> AgentState:
     log_stage("USER QUERY", icon="💡")
-    #print("=== USER QUERY TRANSFERED TO AGENT ===")
 
     files = state.get("files", [])
     if files:
-        print(f"Processing {len(files)} files:")
         log_stage("FILE PREPARATION", subtitle=f"Processing {len(files)} file(s)", icon="📁")
         file_info = preprocess_files(files)
     
         for file_path, info in file_info.items():
-            print(f"  - {file_path}: {info['type']} ({info['size']} bytes) -> {info['suggested_tool']}")
+            #print(f"  - {file_path}: {info['type']} ({info['size']} bytes) -> {info['suggested_tool']}")
             log_key_values(
                 [
                     ("path", file_path),
@@ -103,30 +101,13 @@ def planner(state : AgentState) -> AgentState:
 
 def agent(state: AgentState) -> AgentState:
     
-    """
-    sys_msg = SystemMessage(
-        content=SYSTEM_EXECUTOR_PROMPT.strip().format(
-            plan=json.dumps(state["plan"], indent=2)
-        )
-    )
-    """
+    
     current_step = state.get("current_step", 0)
     reasoning_done = state.get("reasoning_done", False)
     plan: Optional[PlannerPlan] = state.get("plan")
     previous_tool_results = state.get("previous_tool_results", {})
 
     #steps = state["plan"].steps
-
-    """
-    print(f"=== AGENT DEBUG ===")
-    print(f"Current step: {current_step}")
-    print(f"Reasoning done: {reasoning_done}")
-    print(f"Plan exists: {plan is not None}")
-    print(f"Total steps in plan: {len(plan.steps) if plan else 'No plan'}")
-
-    if not plan or not hasattr(plan, 'steps') or not plan.steps:
-        print("ERROR: No valid plan found!")
-    """
 
     if not plan or not hasattr(plan, 'steps'):
         log_stage("PLAN VALIDATION", subtitle="Planner returned no actionable steps", icon="⚠️")
@@ -157,7 +138,6 @@ def agent(state: AgentState) -> AgentState:
         }
 
     current_step_info = steps[current_step]
-    #print(f"Executing step {current_step + 1}: {current_step_info.description}")
 
     log_stage(
         "EXECUTION",
@@ -201,18 +181,9 @@ def agent(state: AgentState) -> AgentState:
 
     if not reasoning_done:
 
-        instruction = HumanMessage(
-            content=(
-                "Provide reasoning for this step inside <REASONING>...</REASONING>. "
-                "Do not call any tools yet."
-            )
-        )
-        stack = [system_message] + state["messages"] + [instruction]
-        reasoning_response = llm_reasoning.invoke(stack) #default llm
         log_stage("REASONING", subtitle=f"{current_step_info.id}", icon="🧠")
-        print(reasoning_response.content)
+        #print(reasoning_response.content)
 
-        # ✅ ДОБАВЛЕНО: Специальный контекст для файлов
         file_context = ""
         file_contents = state.get("file_contents", {})
         if file_contents:
@@ -242,8 +213,8 @@ def agent(state: AgentState) -> AgentState:
         stack = [sys_msg] + state["messages"]
 
         step = llm_reasoning.invoke(stack)
-        print("=== REASONING STEP ===")
-        print(step.content)
+        #print("=== REASONING STEP ===")
+        #print(step.content)
 
         return {
             "messages" : state["messages"] + [step],
@@ -266,7 +237,7 @@ def agent(state: AgentState) -> AgentState:
         # Используем модель С инструментами для выполнения
         step = llm_with_tools.invoke(stack)
         print("=== TOOL EXECUTION ===")
-        print(step)
+        #print(step)
         print(f"Tool calls: {step.tool_calls}")
         
         return {
@@ -278,7 +249,7 @@ def agent(state: AgentState) -> AgentState:
 def should_continue(state : AgentState) -> bool:
     
     last_message = state["messages"][-1]
-    print(f"=== LAST MESSAGE WAS: {last_message} ===")
+    #print(f"=== LAST MESSAGE WAS: {last_message} ===")
     reasoning_done = state.get("reasoning_done", False)
     plan = state.get("plan", None)
     current_step = state.get("current_step", 0)
@@ -401,7 +372,7 @@ def enhanced_finalizer(state: AgentState) -> AgentState:
     
     # Format final answer for user
     formatted_answer = format_final_answer(execution_report, state.get('complexity_assessment', {}))
-    print(execution_report)
+    #print(execution_report)
     return {
         "execution_report": execution_report,
         "final_answer": formatted_answer
@@ -422,7 +393,7 @@ def simple_executor(state: AgentState) -> AgentState:
     Provide a clear, concise answer.
     """
     
-    response = llm_with_tools.invoke([
+    response = llm_simple_with_tools.invoke([
         SystemMessage(content=simple_prompt),
         HumanMessage(content=state['query'])
     ])
@@ -574,11 +545,11 @@ def replanner_old(state: AgentState) -> AgentState:
                 isinstance(msg, HumanMessage)):
                 essential_messages.append(msg)
     
-    print(f"Cleaned message history: {len(current_messages)} -> {len(essential_messages)} messages")
-    print("=== ESSENTIAL MESSAGES ===")
-    print(essential_messages)
-    print("=== AGENT STATE ===")
-    print(state["messages"])
+    #print(f"Cleaned message history: {len(current_messages)} -> {len(essential_messages)} messages")
+    #print("=== ESSENTIAL MESSAGES ===")
+    #print(essential_messages)
+    #print("=== AGENT STATE ===")
+    #print(state["messages"])
 
     return {
         "plan": revised_plan,
@@ -621,7 +592,7 @@ def replanner(state: AgentState) -> AgentState:
     
     # ИСПРАВЛЕНИЕ: Сохраняем важные результаты инструментов
     current_messages = state.get("messages", [])
-    
+    state["previous_final_answer"] = state.get("final_answer", "")
     # Находим полезные результаты инструментов
     preserved_messages = []
     tool_results = {}
@@ -660,7 +631,7 @@ def replanner(state: AgentState) -> AgentState:
                     preserved_messages.append(msg)
     
     print(f"Preserved {len(tool_results)} tool results")
-    print(f"Cleaned message history: {len(current_messages)} -> {len(preserved_messages)} messages")
+    #print(f"Cleaned message history: {len(current_messages)} -> {len(preserved_messages)} messages")
     
     # Добавляем контекст о доступных результатах
     if tool_results:

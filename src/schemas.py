@@ -67,7 +67,7 @@ class ExecutionReport(BaseModel):
     assumptions_made: List[str] = Field(default_factory=list, description="Any assumptions made during execution")
     confidence_level: Literal["low", "medium", "high"] = Field(description="Confidence in the answer")
     limitations: List[str] = Field(default_factory=list, description="Known limitations or caveats")
-    final_answer: str = Field(description="The actual answer to the user's query")
+    final_answer: str = Field(description="NO OTHER WORDS EXCEPT THESE RULES: Formatting rules: 1. If the question asks for a *first name*, output the first given name only.\n 2. If the answer is purely numeric, output digits only (no commas, units, words) as a string. \n 3. Otherwise capitalize the first character of your answer **unless** doing so would change the original spelling of text you are quoting verbatim")
 
     class Config:
         extra = "forbid"

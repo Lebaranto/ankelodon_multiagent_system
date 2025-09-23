@@ -20,4 +20,5 @@ class AgentState(MessagesState):
     max_iterations: int
     execution_report : ExecutionReport
     previous_tool_results: Dict[str, str]  # НОВОЕ ПОЛЕ для сохранения результатов
+    previous_final_answer: str  # НОВОЕ ПОЛЕ для сохранения предыдущих окончательных ответов
 
