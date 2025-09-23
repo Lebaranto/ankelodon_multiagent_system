@@ -17,7 +17,7 @@ This project leverages [LangGraph](https://python.langgraph.org/) and [LangChain
 It combines planning, execution and critique to solve open‑ended queries that might involve search, file analysis, mathematics, coding or image understanding.  
 By breaking down tasks into manageable steps and selecting the right tool for each job, Ankelodon aims to deliver accurate answers with verifiable evidence.
 
-![project logo](docs/images/ankelodon_banner.png)
+![project logo](docs/images/logo.png)
 
 > *Note: The banner above is a placeholder. You can replace it with your own image placed at `docs/images/ankelodon_banner.png`.*
 
