@@ -17,9 +17,6 @@ This project leverages [LangGraph](https://python.langgraph.org/) and [LangChain
 It combines planning, execution and critique to solve open‑ended queries that might involve search, file analysis, mathematics, coding or image understanding.  
 By breaking down tasks into manageable steps and selecting the right tool for each job, Ankelodon aims to deliver accurate answers with verifiable evidence.
 
-![project logo](docs/images/logo.png)
-
-> *Note: The banner above is a placeholder. You can replace it with your own image placed at `docs/images/logo.png`.*
 
 ## 🌟 Features
 
@@ -27,20 +24,20 @@ By breaking down tasks into manageable steps and selecting the right tool for ea
 
 Before doing any heavy lifting, Ankelodon evaluates the incoming query to determine whether it requires planning or can be answered directly.  
 Simple questions (e.g. definitions, single mathematical operations) are answered via a lightweight executor.  
-Moderate and complex queries trigger the planner and agent pipeline, ensuring appropriate decomposition and tool usage【942452390578334†L22-L34】.
+Moderate and complex queries trigger the planner and agent pipeline, ensuring appropriate decomposition and tool usage.
 
 ### 🧭 Structured planning
 
 For non‑trivial tasks, a **planner** LLM generates a structured plan consisting of a series of steps.  
 Each step has an ID, goal, selected tool, expected result and fallback strategy.  
-The plan is stored as a Pydantic model (`PlannerPlan`) with strong typing for reliability【981681905155103†L82-L100】.
+The plan is stored as a Pydantic model (`PlannerPlan`) with strong typing for reliability.
 
 ### 🤖 Agent execution
 
 The **agent** node follows the plan step‑by‑step.  
 For each step it first produces reasoning, then invokes the suggested tool with the appropriate inputs.  
 Tool outputs are captured and fed back into subsequent reasoning.  
-The agent continues until all steps are complete or an error requires replanning【981681905155103†L161-L186】.
+The agent continues until all steps are complete or an error requires replanning.
 
 ### 🧰 Rich toolset
 
@@ -58,13 +55,13 @@ Ankelodon exposes a curated set of tools bound to the execution LLM:
 | `vision_qa_gemma` | Answer questions about images using a vision model |
 | `safe_code_run` | Execute Python code securely in an isolated environment |
 
-These tools are loaded into a `ToolNode` and passed to the agent for use during execution【774776463100239†L10-L14】.
+These tools are loaded into a `ToolNode` and passed to the agent for use during execution.
 
 ### 📝 Comprehensive reporting & critique
 
 After the agent finishes, a deterministic LLM generates a structured execution report.  
 This report summarises the query, steps taken, key findings, sources used, and the final answer.  
-A separate **critic** LLM evaluates the report for completeness, accuracy, methodology and evidence, scoring it out of 10 and suggesting improvements if necessary【981681905155103†L459-L525】.  
+A separate **critic** LLM evaluates the report for completeness, accuracy, methodology and evidence, scoring it out of 10 and suggesting improvements if necessary.  
 The system may then replan and re‑execute until the answer meets quality thresholds.
 
 ## 🏗 Architecture
@@ -79,13 +76,13 @@ Ankelodon is built as a directed acyclic graph of nodes. The high‑level flow i
 6. **FINALIZER** – Consolidate the execution into a report and extract a formatted final answer.  
 7. **CRITIC** – Score the report and decide whether to accept or trigger the **REPLANNER**.  
 
-The graph is compiled using LangGraph’s `StateGraph` API and is flexible enough to be extended with new nodes or tools【942452390578334†L8-L50】.
+The graph is compiled using LangGraph’s `StateGraph` API and is flexible enough to be extended with new nodes or tools.
 
 ## 🚀 Getting started
 
 ### Prerequisites
 
-This project targets **Python 3.10+**. You’ll need API keys or credentials for any external services (e.g. OpenAI, Tavily, Gemini) used by tools.  
+This project targets **Python 3.11+**. You’ll need API keys or credentials for any external services (e.g. OpenAI, Tavily, Gemini) used by tools.  
 Assuming you have a virtual environment activated:
 
 ```bash
